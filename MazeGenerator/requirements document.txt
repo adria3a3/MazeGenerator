@@ -1,0 +1,18 @@
+﻿Only generate perfect mazes
+Make sure the red line does not cross the wall
+Make sure the openings in the walls are wide enough, at least 15 times the line width
+Ensure the maze has a single entrance and a single exit
+The maze should be solvable, with a clear path from entrance to exit
+The maze should have openings drawn in walls
+Keep good separation of concerns in the codebase
+Use appropriate data structures to represent the maze
+Optimize for performance to handle larger mazes efficiently
+The outer ring needs to be drawn except for the exit
+The inner ring needs to be drawn except for the entrance
+Ensure the red line is in the middle of the corridor
+the solution needs to be drawn on top of the maze
+solution needs to follow corridors and not cut through walls
+Red line should not cross walls even when corssing rings
+The maze show only draw perfect mazes
+Maze should be a2 format
+Maze should be 20 rings
