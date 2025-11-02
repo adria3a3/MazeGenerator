@@ -1,158 +1,142 @@
-﻿﻿﻿# Circular Maze Generator
+﻿# Circular Maze Generator
 
-A C# console application that generates circular maze puzzles as high-quality PDF files suitable for A3 printing.
+A C# .NET 9.0 command-line application that generates circular mazes with configurable parameters and exports them to PDF format.
 
 ## Features
 
-- **Circular Maze Generation**: Creates perfect mazes with configurable concentric rings
-- **Smart Pathfinding**: Uses BFS algorithm to find optimal entrance/exit positions
-- **PDF Output**: Vector graphics for crisp printing at any size
-- **Solution Generation**: Automatically creates both puzzle and solution PDFs
-- **Customizable**: Configure ring count, coverage requirements, wall thickness, and more
-- **Reproducible**: Seed-based generation for consistent results
+- **Circular Grid Structure**: Generates mazes with concentric rings (1-100 rings)
+- **Perfect Maze Generation**: Creates perfect mazes (exactly one path between any two cells)
+- **Solution Path Finding**: Automatically finds and marks the optimal solution path
+- **Customizable Coverage**: Ensures solution paths meet minimum coverage requirements (0-100%)
+- **PDF Export**: Generates high-quality PDF files for both maze and solution
+- **Reproducible Generation**: Support for random seeds for consistent maze generation
+- **Configurable Appearance**: Adjustable wall thickness and styling options
 
 ## Requirements
 
-- .NET 9.0 or later
+- .NET 9.0 SDK or later
 - Windows, macOS, or Linux
+
+## Dependencies
+
+- CommandLine - Command-line argument parsing
+- PdfSharp - PDF generation and rendering
+- SkiaSharp - Graphics rendering
+- Microsoft.Extensions.DependencyInjection - Dependency injection
+- Microsoft.Extensions.Logging - Logging infrastructure
 
 ## Installation
 
+1. Clone the repository:
 ```bash
-# Clone or download the project
-cd C:\Users\Adri\RiderProjects\MazeGenerator
+git clone <repository-url>
+cd MazeGenerator
+```
 
-# Build the project
+2. Build the project:
+```bash
 dotnet build
+```
+
+3. Run the application:
+```bash
+dotnet run --project MazeGenerator
+```
+
+Or build a release version:
+```bash
+dotnet build -c Release
 ```
 
 ## Usage
 
 ### Basic Usage
 
+Generate a default maze (20 rings, 50% coverage):
 ```bash
-# Generate a simple maze with 8 rings
-dotnet run --project MazeGenerator -- -r 8 -o my_maze
-```
-
-This will create:
-- `my_maze.pdf` - The maze puzzle
-- `my_maze_solution.pdf` - The maze with solution path
-
-### Advanced Usage
-
-```bash
-# Maze with specific coverage requirement (50% minimum)
-dotnet run --project MazeGenerator -- -r 10 -c 50 -o complex_maze
-
-# Reproducible maze with seed
-dotnet run --project MazeGenerator -- -r 6 -s 123 -o seeded_maze
-
-# Custom wall thickness (default is 2.0)
-dotnet run --project MazeGenerator -- -r 8 -w 3.0 -o thick_walls
-
-# Generate puzzle only (no solution)
-dotnet run --project MazeGenerator -- -r 8 --no-solution -o puzzle_only
+MazeGenerator.exe
 ```
 
 ### Command-Line Options
 
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--rings` | `-r` | Number of concentric rings (3-20) | 8 |
-| `--coverage` | `-c` | Minimum path coverage percentage (0-100) | 40 |
-| `--output` | `-o` | Output filename (without extension) | `maze` |
-| `--seed` | `-s` | Random seed for reproducible generation | Random |
-| `--wall-thickness` | `-w` | Wall thickness in mm | 2.0 |
-| `--no-solution` | | Skip solution PDF generation | false |
-| `--help` | `-h` | Show help information | - |
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--rings` | `-r` | 20 | Number of concentric rings in the maze (1-100) |
+| `--min-coverage` | `-c` | 50 | Minimum solution path coverage as a percentage (0-100) |
+| `--seed` | `-s` | Random | Random seed for reproducible maze generation (optional) |
+| `--output` | `-o` | circular_maze | Base name for output files (without extension) |
+| `--wall-thickness` | | 2.0 | Wall line thickness in points (0.5-10.0) |
+| `--no-solution` | | false | Skip generation of solution file |
+| `--braid` | | 0.0 | Probability (0.0-1.0) of removing dead ends to create a braided maze |
 
 ### Examples
 
+Generate a maze with 30 rings and 75% minimum coverage:
 ```bash
-# Quick test maze
-dotnet run --project MazeGenerator -- -r 5 -o test
-
-# Complex maze for printing
-dotnet run --project MazeGenerator -- -r 12 -c 60 -w 2.5 -o printable_maze
-
-# Reproducible set of mazes
-dotnet run --project MazeGenerator -- -r 8 -s 100 -o maze_100
-dotnet run --project MazeGenerator -- -r 8 -s 101 -o maze_101
-dotnet run --project MazeGenerator -- -r 8 -s 102 -o maze_102
+MazeGenerator.exe --rings 30 --min-coverage 75
 ```
 
-## How It Works
+Generate a reproducible maze with a specific seed:
+```bash
+MazeGenerator.exe --seed 12345 --output my_maze
+```
 
-1. **Grid Creation**: Builds a circular grid with the specified number of rings and segments
-2. **Maze Generation**: Uses Recursive Backtracking to create a perfect maze
-3. **Path Finding**: BFS algorithm finds the longest path for optimal entrance/exit placement
-4. **Coverage Check**: Ensures the solution path meets the minimum coverage requirement
-5. **PDF Rendering**: Generates high-quality vector graphics on A3 paper (297mm × 420mm)
+Generate a maze without a solution file:
+```bash
+MazeGenerator.exe --no-solution
+```
 
-## Output Format
+Generate a braided maze (reduces dead ends):
+```bash
+MazeGenerator.exe --braid 0.3
+```
 
-- **Paper Size**: A3 (297mm × 420mm)
-- **Format**: PDF with vector graphics
-- **Maze Position**: Centered on page
-- **Solution Path**: Red line overlay (in solution PDF)
-- **Quality**: Suitable for professional printing
+Customize wall thickness:
+```bash
+MazeGenerator.exe --wall-thickness 3.5
+```
+
+## Output Files
+
+The application generates the following PDF files:
+
+- `{output-name}.pdf` - The maze without solution
+- `{output-name}_solution.pdf` - The maze with solution path highlighted (unless `--no-solution` is specified)
 
 ## Project Structure
 
 ```
 MazeGenerator/
-├── MazeGenerator/              # Main application
-│   ├── CLI/
-│   │   └── MazeCommand.cs      # Command-line interface
-│   ├── Models/
-│   │   ├── Cell.cs             # Cell representation
-│   │   ├── MazeConfiguration.cs # Configuration settings
-│   │   ├── MazeGrid.cs         # Grid structure
-│   │   └── WallDirection.cs    # Wall directions enum
-│   ├── Services/
-│   │   ├── GeometryCalculator.cs # Geometric calculations
-│   │   ├── GridBuilder.cs      # Grid construction
-│   │   ├── MazeGenerator.cs    # Maze generation algorithm
-│   │   └── PathFinder.cs       # BFS pathfinding
-│   ├── Rendering/
-│   │   └── MazeRenderer.cs     # PDF rendering
-│   └── Program.cs              # Entry point
-├── docs/                       # Development documentation
-│   └── README.md               # Documentation index
-├── test-outputs/               # Test PDF files
-│   └── README.md               # Test outputs guide
-├── README.md                   # This file
-└── MazeGenerator.sln           # Solution file
+├── CLI/
+│   └── MazeCommand.cs           # Command-line interface and options
+├── Models/
+│   ├── Cell.cs                  # Cell representation
+│   ├── MazeConfiguration.cs     # Configuration model
+│   ├── MazeGrid.cs              # Grid structure
+│   └── WallDirection.cs         # Wall direction enumeration
+├── Services/
+│   ├── GeometryCalculator.cs    # Geometric calculations
+│   ├── GridBuilder.cs           # Grid construction logic
+│   ├── MazeGenerator.cs         # Maze generation algorithm
+│   ├── MazeValidation.cs        # Maze validation utilities
+│   └── PathFinder.cs            # Solution path finding
+├── Rendering/
+│   └── MazeRenderer.cs          # PDF rendering logic
+└── Program.cs                   # Application entry point
 ```
 
-## Dependencies
+## Algorithm
 
-- **CommandLineParser**: CLI argument parsing
-- **PdfSharp**: PDF generation and vector graphics
-- **SkiaSharp**: Additional graphics support
+1. **Grid Initialization**: Creates a circular grid with the specified number of rings
+2. **Maze Generation**: Uses a recursive backtracking algorithm to create a perfect maze
+3. **Solution Path Finding**: Finds the optimal entrance/exit pair and calculates the solution path
+4. **PDF Rendering**: Renders the maze and solution to high-quality PDF files
 
 ## License
 
 This project is provided as-is for educational and personal use.
 
-## Documentation
-
-For detailed development documentation, see the [docs/](docs/) folder:
-
-### Available Documentation
-
-- **[REQUIREMENTS_VALIDATION_CHECKLIST.md](docs/REQUIREMENTS_VALIDATION_CHECKLIST.md)** - Comprehensive checklist for validating requirements compliance
-- **[TEST_PLAN.md](docs/TEST_PLAN.md)** - Test planning and testing strategies
-- **Implementation Guides** - Technical details on maze rendering and solution paths
-- **Bug Fixes** - History of bugs fixed during development
-
 ## Contributing
 
-This is a complete, standalone project. Feel free to fork and modify for your needs.
-
-## Status
-
-✅ **Production Ready** - All core functionality is complete and tested.
-
+Contributions are welcome! Please feel free to submit issues or pull requests.
 
