@@ -403,3 +403,6 @@ FodyWeavers.xsd
 *.pdf
 !docs/**/*.pdf
 
+# Claude Code local session data
+.claude/
+
