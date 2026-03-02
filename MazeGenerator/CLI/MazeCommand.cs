@@ -1,4 +1,4 @@
-﻿using CommandLine;
+using CommandLine;
 using MazeGenerator.Models;
 
 namespace MazeGenerator.CLI;
@@ -17,15 +17,11 @@ public class Options
     [Option('o', "output", Default = "circular_maze", HelpText = "Base name for output files (without extension).")]
     public string OutputBaseName { get; init; } = "circular_maze";
 
-
     [Option("wall-thickness", Default = 2.0, HelpText = "Wall line thickness in points (0.5-10.0).")]
     public double WallThickness { get; init; }
 
     [Option("no-solution", Default = false, HelpText = "Skip generation of solution file.")]
     public bool NoSolution { get; init; }
-
-    [Option("braid", Default = 0.0, HelpText = "Probability (0.0-1.0) of removing dead ends to create a braided maze.")]
-    public double Braid { get; init; }
 }
 
 public static class MazeCommand
@@ -57,26 +53,21 @@ public static class MazeCommand
         {
             Console.Error.WriteLine("Configuration errors:");
             foreach (var error in errors)
-            {
                 Console.Error.WriteLine($"  • {error}");
-            }
             return 1;
         }
 
-        // Display configuration
         DisplayConfiguration(config);
 
         // Phase 3: Build grid
         Console.WriteLine("Building maze grid...");
         var grid = new MazeGrid(config);
-        
+
         try
         {
             grid.Initialize();
             Console.WriteLine("✓ Grid initialized successfully");
             Console.WriteLine();
-            
-            // Display grid statistics
             DisplayGridStatistics(grid);
         }
         catch (Exception ex)
@@ -88,21 +79,19 @@ public static class MazeCommand
         // Phase 4: Generate maze
         Console.WriteLine("Generating maze...");
         var generator = new Services.MazeGenerator(config.Seed);
+
         try
         {
             generator.GenerateMaze(grid);
-            
             Console.WriteLine("✓ Maze generation complete");
 
-            // We only validate for perfection if braiding is not applied.
             if (!Services.MazeValidation.IsPerfectMaze(grid))
             {
                 Console.Error.WriteLine("✗ Error: Maze generation failed. The resulting maze is not a perfect maze.");
-                DisplayMazeStatistics(grid); // Display stats for debugging
+                DisplayMazeStatistics(grid);
                 return 1;
             }
-            
-            // Display generation statistics
+
             DisplayMazeStatistics(grid);
         }
         catch (Exception ex)
@@ -111,76 +100,67 @@ public static class MazeCommand
             return 1;
         }
 
-        // Phase 5 & 6: Find solution path with optimal entrance/exit selection
-        // Skip this phase entirely if --no-solution flag is set
-        if (!config.NoSolution)
+        // Phase 5: Find optimal entrance/exit and create boundary openings.
+        // This always runs so the maze PDF always has a proper exit gap and open center.
+        Console.WriteLine("Finding entrance/exit...");
+
+        try
         {
-            Console.WriteLine("Finding solution path...");
-            try
+            var random = config.Seed.HasValue ? new Random(config.Seed.Value) : new Random();
+            var pathFinder = new Services.PathFinder();
+
+            var (entrance, exit) = pathFinder.FindOptimalAndCreateOpenings(
+                grid, generator, random, config.MinCoverage, log: Console.WriteLine);
+
+            Console.WriteLine($"  Entrance: Ring {entrance.RingIndex}, Cell {entrance.CellIndex}");
+            Console.WriteLine($"  Exit:     Ring {exit.RingIndex}, Cell {exit.CellIndex}");
+
+            grid.Entrance = entrance;
+            grid.Exit = exit;
+
+            // Phase 6: Find solution path (skipped when --no-solution is set)
+            if (!config.NoSolution)
             {
-                var random = config.Seed.HasValue ? new Random(config.Seed.Value) : new Random();
-                var pathFinder = new Services.PathFinder();
-
-                // 1. Find the optimal entrance/exit and create openings.
-                // This method will also handle maze regeneration if coverage is not met.
-                var (entrance, exit) = pathFinder.FindOptimalAndCreateOpenings(grid, generator, random, config.MinCoverage);
-
-                var selectionMethod = "Optimal (diameter-based)";
-                Console.WriteLine($"  Selection Method:   {selectionMethod}");
-                Console.WriteLine($"  Entrance: Ring {entrance.RingIndex}, Cell {entrance.CellIndex}");
-                Console.WriteLine($"  Exit:     Ring {exit.RingIndex}, Cell {exit.CellIndex}");
-
-                // 2. Find the path now that the grid data is correct.
                 var solutionPath = pathFinder.FindPath(entrance, exit);
-                
+
                 if (solutionPath.Count == 0)
                 {
                     Console.Error.WriteLine("✗ Error: No path found from entrance to exit!");
                     return 1;
                 }
-                
-                // Mark cells on solution path
-                pathFinder.MarkSolutionPath(solutionPath);
-                
-                // Store the solution path in the grid for rendering
+
                 grid.SolutionPath = solutionPath;
-                grid.Entrance = entrance;
-                grid.Exit = exit;
-                
                 Console.WriteLine("✓ Solution path found");
-                
-                // Display solution statistics
                 DisplaySolutionStatistics(grid, solutionPath, config);
             }
-            catch (Exception ex)
+            else
             {
-                Console.Error.WriteLine($"Error finding solution path: {ex.Message}");
-                return 1;
+                Console.WriteLine("Skipping solution path (--no-solution flag set)");
             }
         }
-        else
+        catch (Exception ex)
         {
-            Console.WriteLine("Skipping solution path generation (--no-solution flag set)");
+            Console.Error.WriteLine($"Error finding entrance/exit: {ex.Message}");
+            return 1;
         }
 
         // Phase 7: Render PDFs
         Console.WriteLine("Rendering PDF output...");
+
         try
         {
             var renderer = new Rendering.MazeRenderer();
-            
-            // Always render the maze without solution
+
             var mazePdfPath = $"{config.OutputBaseName}.pdf";
             renderer.RenderMazeToPdf(grid, mazePdfPath);
-            
-            // Render solution PDF only if a solution path exists
+            Console.WriteLine($"  ✓ Saved maze to: {mazePdfPath}");
+
             if (grid.SolutionPath.Count > 0)
             {
                 var solutionPdfPath = $"{config.OutputBaseName}_solution.pdf";
                 renderer.RenderMazeWithSolutionToPdf(grid, solutionPdfPath);
+                Console.WriteLine($"  ✓ Saved solution to: {solutionPdfPath}");
             }
-            
-            Console.WriteLine("✓ PDF rendering complete");
         }
         catch (Exception ex)
         {
@@ -220,7 +200,7 @@ public static class MazeCommand
         Console.WriteLine($"  Inner Radius:       {config.InnerRadius} pt");
         Console.WriteLine();
     }
-    
+
     private static void DisplayGridStatistics(MazeGrid grid)
     {
         Console.WriteLine("Grid Statistics:");
@@ -229,48 +209,41 @@ public static class MazeCommand
         Console.WriteLine($"  Usable Radius:      {grid.UsableRadius:F2} pt ({grid.UsableRadius / 2.8346:F2} mm)");
         Console.WriteLine();
         Console.WriteLine("Cells per Ring:");
-        
+
         for (var i = 0; i < grid.CellCounts.Count; i++)
         {
             var cellCount = grid.CellCounts[i];
             var (innerR, outerR) = Services.GeometryCalculator.GetRingRadii(
-                i, 
-                grid.Configuration.InnerRadius, 
-                grid.RingWidth
-            );
+                i, grid.Configuration.InnerRadius, grid.RingWidth);
             var midR = (innerR + outerR) / 2.0;
             var circumference = 2 * Math.PI * midR;
             var cellArcLength = circumference / cellCount;
-            
+
             Console.WriteLine($"  Ring {i + 1,2}: {cellCount,3} cells  " +
-                            $"(r={midR / 2.8346:F1}mm, arc={cellArcLength / 2.8346:F1}mm)");
+                              $"(r={midR / 2.8346:F1}mm, arc={cellArcLength / 2.8346:F1}mm)");
         }
+
         Console.WriteLine();
     }
-    
+
     private static void DisplayMazeStatistics(MazeGrid grid)
     {
-        // Count visited cells
         var visitedCells = 0;
         var totalConnections = 0;
-        
+
         foreach (var ring in grid.Cells)
         {
             foreach (var cell in ring)
             {
-                if (cell.Visited)
-                    visitedCells++;
-                
-                // Count connections (each connection counted from both sides)
+                if (cell.Visited) visitedCells++;
                 totalConnections += cell.Passages.Count;
             }
         }
-        
-        // Divide by 2 since each passage is counted twice (once from each side)
+
         var passages = totalConnections / 2;
         var allVisited = visitedCells == grid.TotalCells;
-        var isPerfectMaze = allVisited && (passages == grid.TotalCells - 1);
-        
+        var isPerfectMaze = allVisited && passages == grid.TotalCells - 1;
+
         Console.WriteLine();
         Console.WriteLine("Maze Generation Statistics:");
         Console.WriteLine($"  Visited Cells:      {visitedCells}/{grid.TotalCells}");
@@ -280,13 +253,13 @@ public static class MazeCommand
         Console.WriteLine($"  Perfect Maze:       {(isPerfectMaze ? "✓ Yes (spanning tree)" : "✗ No")}");
         Console.WriteLine();
     }
-    
+
     private static void DisplaySolutionStatistics(MazeGrid grid, List<Cell> solutionPath, MazeConfiguration config)
     {
         var pathFinder = new Services.PathFinder();
         var coverage = pathFinder.CalculateCoverage(solutionPath.Count, grid.TotalCells);
         var meetsCoverage = config.MinCoverage == 0 || coverage >= config.MinCoverage;
-        
+
         Console.WriteLine();
         Console.WriteLine("Solution Path Statistics:");
         Console.WriteLine($"  Path Length:        {solutionPath.Count} cells");
@@ -294,7 +267,7 @@ public static class MazeCommand
         Console.WriteLine($"  Coverage:           {coverage:F1}%");
         Console.WriteLine($"  Required:           {config.MinCoverage}%");
         Console.WriteLine($"  Meets Requirement:  {(meetsCoverage ? "✓ Yes" : "✗ No")}");
-        
+
         if (!meetsCoverage)
         {
             Console.WriteLine();
@@ -304,10 +277,9 @@ public static class MazeCommand
         else if (config.MinCoverage > 0)
         {
             Console.WriteLine();
-            Console.WriteLine($"✓ Coverage requirement satisfied with optimal entrance/exit selection.");
+            Console.WriteLine("✓ Coverage requirement satisfied with optimal entrance/exit selection.");
         }
-        
+
         Console.WriteLine();
     }
 }
-

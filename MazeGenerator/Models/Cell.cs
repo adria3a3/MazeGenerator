@@ -22,13 +22,13 @@ public class Cell
     
     public Cell? CounterClockwiseNeighbor { get; set; }
     
-    public List<Cell> InwardNeighbors { get; } = [];
+    public List<Cell> InwardNeighbors { get; } = new List<Cell>();
     
-    public List<Cell> OutwardNeighbors { get; } = [];
+    public List<Cell> OutwardNeighbors { get; } = new List<Cell>();
     
-    public List<Cell> Passages { get; } = [];
+    public List<Cell> Passages { get; } = new List<Cell>();
 
-    public List<Cell> GetPassableNeighbors()
+    public IReadOnlyList<Cell> GetPassableNeighbors()
     {
         return Passages;
     }

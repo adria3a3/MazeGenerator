@@ -2,12 +2,15 @@
 
 public class GeometryCalculator
 {
+    /// <summary>Minimum opening = wall thickness × this factor.</summary>
+    public const double MinOpeningFactor = 15.0;
+
     public static List<int> CalculateCellCounts(int rings, double innerRadius, double ringWidth, double wallThickness = 2.0)
     {
         var cellCounts = new List<int>();
-        
-        // Minimum opening width required (15x wall thickness per requirement 3)
-        var minOpeningWidth = wallThickness * 15.0;
+
+        // Minimum opening width required (MinOpeningFactor × wall thickness)
+        var minOpeningWidth = wallThickness * MinOpeningFactor;
         
         for (var i = 0; i < rings; i++)
         {

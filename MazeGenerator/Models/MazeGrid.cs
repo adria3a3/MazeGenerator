@@ -4,13 +4,13 @@ public class MazeGrid
 {
     public MazeConfiguration Configuration { get; set; }
     
-    public List<List<Cell>> Cells { get; set; } = [];
+    public List<List<Cell>> Cells { get; set; } = new List<List<Cell>>();
     
     public Cell? Entrance { get; set; }
     
     public Cell? Exit { get; set; }
     
-    public List<Cell> SolutionPath { get; set; } = [];
+    public List<Cell> SolutionPath { get; set; } = new List<Cell>();
     
     public double CenterX { get; set; }
     
@@ -20,7 +20,7 @@ public class MazeGrid
     
     public double RingWidth { get; set; }
     
-    public List<int> CellCounts { get; set; } = [];
+    public List<int> CellCounts { get; set; } = new List<int>();
     
     public int TotalCells => Cells.Sum(ring => ring.Count);
     

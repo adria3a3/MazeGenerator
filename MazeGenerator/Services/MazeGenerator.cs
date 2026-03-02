@@ -2,7 +2,7 @@
 
 namespace MazeGenerator.Services;
 
-public class MazeGenerator
+public class MazeGenerator : IMazeGenerator
 {
     private readonly Random _random;
 
@@ -28,7 +28,8 @@ public class MazeGenerator
 
         // Start from a random cell in the maze
         var stack = new Stack<Cell>();
-        var startCell = grid.Cells[_random.Next(grid.Cells.Count)][0];
+        var startRing = grid.Cells[_random.Next(grid.Cells.Count)];
+        var startCell = startRing[_random.Next(startRing.Count)];
         
         startCell.Visited = true;
         stack.Push(startCell);
