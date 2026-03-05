@@ -37,23 +37,20 @@ public static class MazeValidation
         {
             if (!visited.Contains(startCell))
             {
+                visited.Add(startCell);
                 stack.Push((startCell, null));
 
                 while (stack.Count > 0)
                 {
                     var (current, parent) = stack.Pop();
 
-                    if (visited.Contains(current))
-                        return true; // Cycle detected
-
-                    visited.Add(current);
-
                     foreach (var neighbor in current.GetPassableNeighbors())
                     {
-                        if (neighbor != parent)
-                        {
-                            stack.Push((neighbor, current));
-                        }
+                        if (neighbor == parent) continue;
+                        if (visited.Contains(neighbor))
+                            return true; // True cycle: already visited via a different path
+                        visited.Add(neighbor);
+                        stack.Push((neighbor, current));
                     }
                 }
             }

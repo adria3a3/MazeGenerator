@@ -136,8 +136,8 @@ public class GeometryCalculator
         {
             if (cellCounts[i] < cellCounts[i - 1])
             {
-                // Allow small decreases in outermost rings if needed
-                if (i < cellCounts.Count - 2)
+                // Allow a decrease only in the outermost ring
+                if (i < cellCounts.Count - 1)
                     return false;
             }
         }
@@ -155,6 +155,13 @@ public class GeometryCalculator
         return overlap > 1e-9;
     }
 
+    /// <summary>
+    /// Computes the angular overlap between two arcs on a circle.
+    /// Precondition: each individual arc span must be less than π radians.
+    /// If spans could be larger, more than one of the three period-shifted
+    /// comparisons could be simultaneously positive, potentially overestimating the result.
+    /// Cell arcs in this codebase are always much smaller than π.
+    /// </summary>
     public static double GetAngularOverlap(double start1, double end1, double start2, double end2)
     {
         // Normalize angles to handle wrap-around cases gracefully
@@ -166,12 +173,12 @@ public class GeometryCalculator
         if (end1 < start1) end1 += 2 * Math.PI;
         if (end2 < start2) end2 += 2 * Math.PI;
 
-        // Calculate the intersection of the two angular ranges
-        var overlapStart = Math.Max(start1, start2);
-        var overlapEnd = Math.Min(end1, end2);
-
-        // The overlap is the difference between the end and start of the intersection
-        return overlapEnd - overlapStart;
+        // Check all three relative period alignments to handle arcs that straddle the 0/2π boundary.
+        const double twoPi = 2 * Math.PI;
+        var o1 = Math.Min(end1, end2) - Math.Max(start1, start2);
+        var o2 = Math.Min(end1, end2 + twoPi) - Math.Max(start1, start2 + twoPi);
+        var o3 = Math.Min(end1 + twoPi, end2) - Math.Max(start1 + twoPi, start2);
+        return Math.Max(0.0, Math.Max(o1, Math.Max(o2, o3)));
     }
     
     private static double NormalizeAngle(double angle)

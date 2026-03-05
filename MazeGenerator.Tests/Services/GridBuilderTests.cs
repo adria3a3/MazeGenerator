@@ -62,6 +62,14 @@ namespace MazeGenerator.Tests.Services
         }
 
         [Fact]
+        public void BuildGrid_ZeroRings_ThrowsInvalidOperationException()
+        {
+            // rings=0 causes CalculateCellCounts to return [], ValidateCellCounts([]) → false → throw.
+            var grid = new MazeGrid(new MazeConfiguration { Rings = 0 });
+            Assert.Throws<InvalidOperationException>(() => grid.Initialize());
+        }
+
+        [Fact]
         public void BuildGrid_CellsHaveCorrectAnglesAndRadii()
         {
             var grid = CreateGrid(2);

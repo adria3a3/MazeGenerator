@@ -38,6 +38,12 @@ public class MazeConfiguration
         if (string.IsNullOrWhiteSpace(OutputBaseName))
             errors.Add("Output base name cannot be empty.");
 
+        if (!string.IsNullOrWhiteSpace(OutputBaseName) && OutputBaseName.Contains(".."))
+            errors.Add("Output base name must not contain directory traversal (..) sequences.");
+
+        if (!string.IsNullOrWhiteSpace(OutputBaseName) && Path.IsPathRooted(OutputBaseName))
+            errors.Add("Output base name must be a relative path.");
+
         if (PageWidth <= 0)
             errors.Add("PageWidth must be positive.");
 
@@ -52,6 +58,10 @@ public class MazeConfiguration
 
         if (InnerRadius <= 0)
             errors.Add("InnerRadius must be positive.");
+
+        var usableRadius = Math.Min((PageWidth / 2.0) - Margin, (PageHeight / 2.0) - Margin);
+        if (usableRadius > 0 && InnerRadius >= usableRadius)
+            errors.Add($"InnerRadius ({InnerRadius}) must be less than the usable radius ({usableRadius:F1}).");
 
         return errors;
     }

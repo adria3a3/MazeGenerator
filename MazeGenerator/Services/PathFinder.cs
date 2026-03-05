@@ -45,11 +45,6 @@ public class PathFinder
         while (current != entrance)
         {
             path.Add(current);
-            if (!parent.ContainsKey(current))
-            {
-                // Path broken (shouldn't happen)
-                return new List<Cell>();
-            }
             current = parent[current];
         }
 
@@ -58,7 +53,7 @@ public class PathFinder
         return path;
     }
 
-    public Cell SelectEntrance(MazeGrid grid, Random random)
+    internal Cell SelectEntrance(MazeGrid grid, Random random)
     {
         if (grid.Cells.Count == 0 || grid.Cells[0].Count == 0)
             throw new ArgumentException("Grid has no cells in the innermost ring.", nameof(grid));
@@ -67,7 +62,7 @@ public class PathFinder
         return innerRing[random.Next(innerRing.Count)];
     }
 
-    public Cell SelectExit(MazeGrid grid, Random random)
+    internal Cell SelectExit(MazeGrid grid, Random random)
     {
         if (grid.Cells.Count == 0)
             throw new ArgumentException("Grid has no rings.", nameof(grid));
@@ -79,11 +74,6 @@ public class PathFinder
         var exit = outerRing[random.Next(outerRing.Count)];
         exit.IsExit = true;
         return exit;
-    }
-
-    public void MarkSolutionPath(List<Cell> path)
-    {
-        // Path is stored in grid.SolutionPath, no need to mark individual cells
     }
 
     public double CalculateCoverage(int pathLength, int totalCells)
@@ -183,7 +173,7 @@ public class PathFinder
         return (farthest, path);
     }
 
-    public (Cell endpoint1, Cell endpoint2, List<Cell> path) FindDiameter(MazeGrid grid)
+    internal (Cell endpoint1, Cell endpoint2, List<Cell> path) FindDiameter(MazeGrid grid)
     {
         if (grid.Cells.Count == 0 || grid.Cells[0].Count == 0)
             throw new ArgumentException("Grid has no cells.", nameof(grid));
@@ -238,7 +228,7 @@ public class PathFinder
         exit.IsExit = true;
     }
 
-    public List<Cell> FindSolution(MazeGrid grid)
+    internal List<Cell> FindSolution(MazeGrid grid)
     {
         var startCell = grid.Entrance;
         var exitCell = grid.GetExitCell();

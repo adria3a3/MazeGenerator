@@ -126,6 +126,17 @@ namespace MazeGenerator.Tests.Services
         }
 
         [Fact]
+        public void HasCycles_SingleIsolatedNode_ReturnsFalse()
+        {
+            var config = new MazeConfiguration { Rings = 1 };
+            var grid = new MazeGrid(config);
+            var a = new Cell { RingIndex = 0, CellIndex = 0 };
+            grid.Cells.Add(new List<Cell> { a });
+
+            Assert.False(MazeValidation.HasCycles(grid));
+        }
+
+        [Fact]
         public void HasCycles_DisconnectedComponents_NoCycles_ReturnsFalse()
         {
             var config = new MazeConfiguration { Rings = 1 };

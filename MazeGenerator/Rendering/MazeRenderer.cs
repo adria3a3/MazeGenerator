@@ -122,8 +122,9 @@ public class MazeRenderer
             var exitMidAngle = (grid.Exit.AngleStart + grid.Exit.AngleEnd) / 2.0;
             var openingEnd = exitMidAngle + minAngularWidth / 2.0;
 
-            // Normalize to [0, 2π) so PDFSharp never receives a start angle > 360°
-            var arcStart = openingEnd % (2 * Math.PI);
+            // Normalize to [0, 2π) so PDFSharp never receives a negative or out-of-range start angle.
+            const double twoPi = 2 * Math.PI;
+            var arcStart = ((openingEnd % twoPi) + twoPi) % twoPi;
             DrawArc(gfx, wallPen, centerX, centerY, outermostRadius, arcStart, arcStart + 2 * Math.PI - minAngularWidth);
         }
         else
@@ -150,13 +151,24 @@ public class MazeRenderer
 
         var passages = connectedNeighbors.Select(n =>
         {
-            var overlapStart = Math.Max(cellStartAngle, n.AngleStart);
-            var overlapEnd = Math.Min(cellEndAngle, n.AngleEnd);
+            var nStart = n.AngleStart;
+            var nEnd = n.AngleEnd;
+            if (nEnd < nStart) nEnd += 2 * Math.PI;
+
+            // Shift the neighbor into the cell's angular frame to handle the 0/2π wrap-around.
+            if (nEnd < cellStartAngle) { nStart += 2 * Math.PI; nEnd += 2 * Math.PI; }
+            else if (nStart > cellEndAngle) { nStart -= 2 * Math.PI; nEnd -= 2 * Math.PI; }
+
+            var overlapStart = Math.Max(cellStartAngle, nStart);
+            var overlapEnd = Math.Min(cellEndAngle, nEnd);
+            if (overlapEnd <= overlapStart)
+                return (start: cellStartAngle, end: cellStartAngle); // degenerate — no actual overlap
+
             var overlapMid = (overlapStart + overlapEnd) / 2.0;
             var angularWidth = Math.Max(minAngularWidth, overlapEnd - overlapStart);
 
             return (start: overlapMid - angularWidth / 2.0, end: overlapMid + angularWidth / 2.0);
-        }).OrderBy(p => p.start).ToList();
+        }).Where(p => p.end > p.start).OrderBy(p => p.start).ToList();
 
         var currentAngle = cellStartAngle;
 
@@ -249,7 +261,12 @@ public class MazeRenderer
         // Adjacent rings — radial movement: L-shaped arc + line + arc
         else if (Math.Abs(cell1.RingIndex - cell2.RingIndex) == 1)
         {
-            var passageMidAngle = ((Math.Max(cell1.AngleStart, cell2.AngleStart) + Math.Min(cell1.AngleEnd, cell2.AngleEnd)) / 2.0);
+            // Shift cell2's angular range into cell1's frame to handle the 0/2π wrap-around.
+            var s1 = cell1.AngleStart; var e1 = cell1.AngleEnd;
+            var s2 = cell2.AngleStart; var e2 = cell2.AngleEnd;
+            if (e2 < s1) { s2 += 2 * Math.PI; e2 += 2 * Math.PI; }
+            else if (s2 > e1) { s2 -= 2 * Math.PI; e2 -= 2 * Math.PI; }
+            var passageMidAngle = (Math.Max(s1, s2) + Math.Min(e1, e2)) / 2.0;
 
             var cell1MidRadius = (cell1.RadiusInner + cell1.RadiusOuter) / 2.0;
             var cell2MidRadius = (cell2.RadiusInner + cell2.RadiusOuter) / 2.0;

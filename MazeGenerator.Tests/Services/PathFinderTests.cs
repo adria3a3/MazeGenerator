@@ -341,6 +341,93 @@ namespace MazeGenerator.Tests.Services
 
         #endregion
 
+        #region SelectEntrance / SelectExit guard throws
+
+        [Fact]
+        public void SelectEntrance_EmptyGrid_ThrowsArgumentException()
+        {
+            var pathFinder = new PathFinder();
+            var grid = new MazeGrid(new MazeConfiguration { Rings = 1 }); // Cells list is empty
+            Assert.Throws<ArgumentException>(() => pathFinder.SelectEntrance(grid, new Random(0)));
+        }
+
+        [Fact]
+        public void SelectEntrance_EmptyInnerRing_ThrowsArgumentException()
+        {
+            var pathFinder = new PathFinder();
+            var grid = new MazeGrid(new MazeConfiguration { Rings = 1 });
+            grid.Cells.Add(new List<Cell>()); // ring 0 exists but has no cells
+            Assert.Throws<ArgumentException>(() => pathFinder.SelectEntrance(grid, new Random(0)));
+        }
+
+        [Fact]
+        public void SelectExit_EmptyGrid_ThrowsArgumentException()
+        {
+            var pathFinder = new PathFinder();
+            var grid = new MazeGrid(new MazeConfiguration { Rings = 1 }); // Cells list is empty
+            Assert.Throws<ArgumentException>(() => pathFinder.SelectExit(grid, new Random(0)));
+        }
+
+        [Fact]
+        public void SelectExit_EmptyOuterRing_ThrowsArgumentException()
+        {
+            var pathFinder = new PathFinder();
+            var grid = new MazeGrid(new MazeConfiguration { Rings = 1 });
+            grid.Cells.Add(new List<Cell>()); // outer ring exists but has no cells
+            Assert.Throws<ArgumentException>(() => pathFinder.SelectExit(grid, new Random(0)));
+        }
+
+        #endregion
+
+        #region FindDiameter guard throws
+
+        [Fact]
+        public void FindDiameter_EmptyGrid_ThrowsArgumentException()
+        {
+            var pathFinder = new PathFinder();
+            var grid = new MazeGrid(new MazeConfiguration { Rings = 1 }); // Cells list is empty
+            Assert.Throws<ArgumentException>(() => pathFinder.FindDiameter(grid));
+        }
+
+        [Fact]
+        public void FindDiameter_EmptyInnerRing_ThrowsArgumentException()
+        {
+            var pathFinder = new PathFinder();
+            var grid = new MazeGrid(new MazeConfiguration { Rings = 1 });
+            grid.Cells.Add(new List<Cell>()); // ring 0 exists but has no cells
+            Assert.Throws<ArgumentException>(() => pathFinder.FindDiameter(grid));
+        }
+
+        #endregion
+
+        #region FindOptimalAndCreateOpenings — unreachable outer ring
+
+        [Fact]
+        public void FindOptimalAndCreateOpenings_OuterRingUnreachable_ThrowsInvalidOperationException()
+        {
+            // Entrance connects only to inner-ring cells; outer ring is isolated.
+            // FindFarthestCellInRing finds no reachable target-ring cells and throws.
+            var pathFinder = new PathFinder();
+            var mockGenerator = new Mock<IMazeGenerator>();
+            var grid = new MazeGrid(new MazeConfiguration { Rings = 2 });
+
+            var entrance = new Cell { RingIndex = 0, CellIndex = 0 };
+            var inner2   = new Cell { RingIndex = 0, CellIndex = 1 };
+            var outerCell = new Cell { RingIndex = 1, CellIndex = 0 };
+
+            entrance.CreatePassage(inner2);
+            inner2.CreatePassage(entrance);
+
+            grid.Cells.Add(new List<Cell> { entrance, inner2 });
+            grid.Cells.Add(new List<Cell> { outerCell });
+
+            Assert.Throws<InvalidOperationException>(() =>
+                pathFinder.FindOptimalAndCreateOpenings(
+                    grid, mockGenerator.Object, new Random(0), minCoverage: 0, maxRetries: 1));
+        }
+
+        #endregion
+
         #region FindSolution
 
         [Fact]

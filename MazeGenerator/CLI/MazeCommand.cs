@@ -59,53 +59,27 @@ public static class MazeCommand
 
         DisplayConfiguration(config);
 
-        // Phase 3: Build grid
-        Console.WriteLine("Building maze grid...");
-        var grid = new MazeGrid(config);
-
         try
         {
+            // Phase 3: Build grid
+            Console.WriteLine("Building maze grid...");
+            var grid = new MazeGrid(config);
+
             grid.Initialize();
             Console.WriteLine("✓ Grid initialized successfully");
             Console.WriteLine();
             DisplayGridStatistics(grid);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error building grid: {ex.Message}");
-            return 1;
-        }
 
-        // Phase 4: Generate maze
-        Console.WriteLine("Generating maze...");
-        var generator = new Services.MazeGenerator(config.Seed);
-
-        try
-        {
+            // Phase 4: Generate maze
+            Console.WriteLine("Generating maze...");
+            var generator = new Services.MazeGenerator(config.Seed);
             generator.GenerateMaze(grid);
             Console.WriteLine("✓ Maze generation complete");
-
-            if (!Services.MazeValidation.IsPerfectMaze(grid))
-            {
-                Console.Error.WriteLine("✗ Error: Maze generation failed. The resulting maze is not a perfect maze.");
-                DisplayMazeStatistics(grid);
-                return 1;
-            }
-
             DisplayMazeStatistics(grid);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error generating maze: {ex.Message}");
-            return 1;
-        }
 
-        // Phase 5: Find optimal entrance/exit and create boundary openings.
-        // This always runs so the maze PDF always has a proper exit gap and open center.
-        Console.WriteLine("Finding entrance/exit...");
-
-        try
-        {
+            // Phase 5: Find optimal entrance/exit and create boundary openings.
+            // This always runs so the maze PDF always has a proper exit gap and open center.
+            Console.WriteLine("Finding entrance/exit...");
             var random = config.Seed.HasValue ? new Random(config.Seed.Value) : new Random();
             var pathFinder = new Services.PathFinder();
 
@@ -122,13 +96,6 @@ public static class MazeCommand
             if (!config.NoSolution)
             {
                 var solutionPath = pathFinder.FindPath(entrance, exit);
-
-                if (solutionPath.Count == 0)
-                {
-                    Console.Error.WriteLine("✗ Error: No path found from entrance to exit!");
-                    return 1;
-                }
-
                 grid.SolutionPath = solutionPath;
                 Console.WriteLine("✓ Solution path found");
                 DisplaySolutionStatistics(grid, solutionPath, config);
@@ -137,18 +104,10 @@ public static class MazeCommand
             {
                 Console.WriteLine("Skipping solution path (--no-solution flag set)");
             }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error finding entrance/exit: {ex.Message}");
-            return 1;
-        }
 
-        // Phase 7: Render PDFs
-        Console.WriteLine("Rendering PDF output...");
+            // Phase 7: Render PDFs
+            Console.WriteLine("Rendering PDF output...");
 
-        try
-        {
             var renderer = new Rendering.MazeRenderer();
 
             var mazePdfPath = $"{config.OutputBaseName}.pdf";
@@ -161,19 +120,19 @@ public static class MazeCommand
                 renderer.RenderMazeWithSolutionToPdf(grid, solutionPdfPath);
                 Console.WriteLine($"  ✓ Saved solution to: {solutionPdfPath}");
             }
+
+            Console.WriteLine();
+            Console.WriteLine("╔════════════════════════════════════════════════════════════╗");
+            Console.WriteLine("║                  Generation Complete!                    ║");
+            Console.WriteLine("╚════════════════════════════════════════════════════════════╝");
+
+            return 0;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error rendering PDF: {ex.Message}");
+            Console.Error.WriteLine($"Error: {ex.Message}");
             return 1;
         }
-
-        Console.WriteLine();
-        Console.WriteLine("╔════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║                  Generation Complete!                    ║");
-        Console.WriteLine("╚════════════════════════════════════════════════════════════╝");
-
-        return 0;
     }
 
     private static void DisplayConfiguration(MazeConfiguration config)
@@ -258,7 +217,6 @@ public static class MazeCommand
     {
         var pathFinder = new Services.PathFinder();
         var coverage = pathFinder.CalculateCoverage(solutionPath.Count, grid.TotalCells);
-        var meetsCoverage = config.MinCoverage == 0 || coverage >= config.MinCoverage;
 
         Console.WriteLine();
         Console.WriteLine("Solution Path Statistics:");
@@ -266,15 +224,9 @@ public static class MazeCommand
         Console.WriteLine($"  Total Cells:        {grid.TotalCells}");
         Console.WriteLine($"  Coverage:           {coverage:F1}%");
         Console.WriteLine($"  Required:           {config.MinCoverage}%");
-        Console.WriteLine($"  Meets Requirement:  {(meetsCoverage ? "✓ Yes" : "✗ No")}");
+        Console.WriteLine($"  Meets Requirement:  {(coverage >= config.MinCoverage ? "✓ Yes" : "✗ No")}");
 
-        if (!meetsCoverage)
-        {
-            Console.WriteLine();
-            Console.WriteLine($"⚠ Warning: Solution path coverage ({coverage:F1}%) is below minimum ({config.MinCoverage}%)");
-            Console.WriteLine("  This may indicate the maze structure or coverage requirement needs adjustment.");
-        }
-        else if (config.MinCoverage > 0)
+        if (config.MinCoverage > 0 && coverage >= config.MinCoverage)
         {
             Console.WriteLine();
             Console.WriteLine("✓ Coverage requirement satisfied with optimal entrance/exit selection.");

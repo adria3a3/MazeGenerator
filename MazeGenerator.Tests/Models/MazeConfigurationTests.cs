@@ -90,6 +90,43 @@ namespace MazeGenerator.Tests.Models
         }
 
         [Theory]
+        [InlineData("../evil")]
+        [InlineData("../../etc/passwd")]
+        [InlineData("foo/../bar")]
+        public void Validate_OutputBaseNameWithTraversal_ReturnsError(string outputBaseName)
+        {
+            var config = new MazeConfiguration { Rings = 10, OutputBaseName = outputBaseName };
+
+            var errors = config.Validate();
+
+            Assert.Contains(errors, e => e.Contains("traversal") || e.Contains(".."));
+        }
+
+        [Theory]
+        [InlineData("/etc/passwd")]
+        [InlineData("C:\\Windows\\evil")]
+        public void Validate_OutputBaseNameAbsolutePath_ReturnsError(string outputBaseName)
+        {
+            var config = new MazeConfiguration { Rings = 10, OutputBaseName = outputBaseName };
+
+            var errors = config.Validate();
+
+            Assert.Contains(errors, e => e.Contains("relative path"));
+        }
+
+        [Theory]
+        [InlineData("my_maze")]
+        [InlineData("output/circular_maze")]
+        public void Validate_OutputBaseNameWithoutTraversal_ReturnsNoTraversalError(string outputBaseName)
+        {
+            var config = new MazeConfiguration { Rings = 10, OutputBaseName = outputBaseName };
+
+            var errors = config.Validate();
+
+            Assert.DoesNotContain(errors, e => e.Contains("traversal") || e.Contains(".."));
+        }
+
+        [Theory]
         [InlineData(0.0)]
         [InlineData(-100.0)]
         public void Validate_NonPositivePageWidth_ReturnsError(double pageWidth)
@@ -134,6 +171,73 @@ namespace MazeGenerator.Tests.Models
             var config = new MazeConfiguration { Rings = 10, InnerRadius = innerRadius };
 
             Assert.Contains(config.Validate(), e => e.Contains("InnerRadius"));
+        }
+
+        [Fact]
+        public void Validate_InnerRadiusExceedsUsableRadius_ReturnsError()
+        {
+            // PageWidth=200, PageHeight=200, Margin=10 → usableRadius = min(90,90) = 90
+            // InnerRadius=100 >= 90 → should produce an error
+            var config = new MazeConfiguration
+            {
+                Rings = 10,
+                PageWidth = 200,
+                PageHeight = 200,
+                Margin = 10,
+                InnerRadius = 100
+            };
+
+            Assert.Contains(config.Validate(), e => e.Contains("InnerRadius") && e.Contains("usable radius"));
+        }
+
+        [Fact]
+        public void Validate_InnerRadiusEqualsUsableRadius_ReturnsError()
+        {
+            // InnerRadius exactly equal to usableRadius should also fail (>= boundary)
+            var config = new MazeConfiguration
+            {
+                Rings = 10,
+                PageWidth = 200,
+                PageHeight = 200,
+                Margin = 10,
+                InnerRadius = 90
+            };
+
+            Assert.Contains(config.Validate(), e => e.Contains("usable radius"));
+        }
+
+        [Fact]
+        public void Validate_InnerRadiusJustBelowUsableRadius_ReturnsNoInnerRadiusError()
+        {
+            // InnerRadius one unit below usableRadius should be valid
+            var config = new MazeConfiguration
+            {
+                Rings = 10,
+                PageWidth = 200,
+                PageHeight = 200,
+                Margin = 10,
+                InnerRadius = 89
+            };
+
+            Assert.DoesNotContain(config.Validate(), e => e.Contains("usable radius"));
+        }
+
+        [Fact]
+        public void Validate_LargeMarginDoesNotCauseDoubleInnerRadiusError()
+        {
+            // When Margin is too large, only the Margin error should fire — not an InnerRadius error too
+            var config = new MazeConfiguration
+            {
+                Rings = 10,
+                PageWidth = 100,
+                PageHeight = 100,
+                Margin = 51,
+                InnerRadius = 1
+            };
+
+            var errors = config.Validate();
+            Assert.Contains(errors, e => e.Contains("Margin"));
+            Assert.DoesNotContain(errors, e => e.Contains("usable radius"));
         }
     }
 }

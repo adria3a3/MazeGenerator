@@ -1,8 +1,9 @@
-﻿using MazeGenerator.CLI;
+using MazeGenerator.CLI;
 using Xunit;
 
 namespace MazeGenerator.Tests.CLI
 {
+    [Collection("IntegrationTests")]
     public class MazeCommandIntegrationTests
     {
         private static string CreateTempDir()
@@ -20,23 +21,43 @@ namespace MazeGenerator.Tests.CLI
             }
         }
 
+        /// <summary>
+        /// Runs an action with the working directory temporarily set to <paramref name="dir"/>.
+        /// OutputBaseName validation rejects absolute paths, so tests must cd into the temp dir.
+        /// </summary>
+        private static void RunInDir(string dir, Action action)
+        {
+            var savedDir = Directory.GetCurrentDirectory();
+            Directory.SetCurrentDirectory(dir);
+            try
+            {
+                action();
+            }
+            finally
+            {
+                Directory.SetCurrentDirectory(savedDir);
+            }
+        }
+
         [Fact]
         public void Execute_ValidArgs_Returns0_AndCreatesPdf()
         {
             var tempDir = CreateTempDir();
-            var baseName = Path.Combine(tempDir, "test_maze");
             try
             {
-                var result = MazeCommand.Execute(new[]
+                RunInDir(tempDir, () =>
                 {
-                    "--rings", "3",
-                    "--seed", "42",
-                    "--min-coverage", "0",
-                    "-o", baseName
-                });
+                    var result = MazeCommand.Execute(new[]
+                    {
+                        "--rings", "3",
+                        "--seed", "42",
+                        "--min-coverage", "0",
+                        "-o", "test_maze"
+                    });
 
-                Assert.Equal(0, result);
-                Assert.True(File.Exists($"{baseName}.pdf"));
+                    Assert.Equal(0, result);
+                    Assert.True(File.Exists(Path.Combine(tempDir, "test_maze.pdf")));
+                });
             }
             finally
             {
@@ -48,17 +69,19 @@ namespace MazeGenerator.Tests.CLI
         public void Execute_InvalidRings_Returns1()
         {
             var tempDir = CreateTempDir();
-            var baseName = Path.Combine(tempDir, "test_maze");
             try
             {
-                var result = MazeCommand.Execute(new[]
+                RunInDir(tempDir, () =>
                 {
-                    "--rings", "0",
-                    "-o", baseName
-                });
+                    var result = MazeCommand.Execute(new[]
+                    {
+                        "--rings", "0",
+                        "-o", "test_maze"
+                    });
 
-                Assert.Equal(1, result);
-                Assert.False(File.Exists($"{baseName}.pdf"));
+                    Assert.Equal(1, result);
+                    Assert.False(File.Exists(Path.Combine(tempDir, "test_maze.pdf")));
+                });
             }
             finally
             {
@@ -70,21 +93,23 @@ namespace MazeGenerator.Tests.CLI
         public void Execute_NoSolutionFlag_SkipsSolutionPdf()
         {
             var tempDir = CreateTempDir();
-            var baseName = Path.Combine(tempDir, "test_maze");
             try
             {
-                var result = MazeCommand.Execute(new[]
+                RunInDir(tempDir, () =>
                 {
-                    "--rings", "3",
-                    "--seed", "42",
-                    "--min-coverage", "0",
-                    "--no-solution",
-                    "-o", baseName
-                });
+                    var result = MazeCommand.Execute(new[]
+                    {
+                        "--rings", "3",
+                        "--seed", "42",
+                        "--min-coverage", "0",
+                        "--no-solution",
+                        "-o", "test_maze"
+                    });
 
-                Assert.Equal(0, result);
-                Assert.True(File.Exists($"{baseName}.pdf"));
-                Assert.False(File.Exists($"{baseName}_solution.pdf"));
+                    Assert.Equal(0, result);
+                    Assert.True(File.Exists(Path.Combine(tempDir, "test_maze.pdf")));
+                    Assert.False(File.Exists(Path.Combine(tempDir, "test_maze_solution.pdf")));
+                });
             }
             finally
             {
@@ -95,23 +120,81 @@ namespace MazeGenerator.Tests.CLI
         [Fact]
         public void Execute_WithSeed_ProducesDeterministicOutput()
         {
-            var tempDir1 = CreateTempDir();
-            var tempDir2 = CreateTempDir();
-            var baseName1 = Path.Combine(tempDir1, "maze1");
-            var baseName2 = Path.Combine(tempDir2, "maze2");
+            var tempDir = CreateTempDir();
             try
             {
-                MazeCommand.Execute(new[] { "--rings", "3", "--seed", "123", "--min-coverage", "0", "-o", baseName1 });
-                MazeCommand.Execute(new[] { "--rings", "3", "--seed", "123", "--min-coverage", "0", "-o", baseName2 });
+                RunInDir(tempDir, () =>
+                {
+                    MazeCommand.Execute(new[] { "--rings", "3", "--seed", "123", "--min-coverage", "0", "-o", "maze1" });
+                    MazeCommand.Execute(new[] { "--rings", "3", "--seed", "123", "--min-coverage", "0", "-o", "maze2" });
 
-                var size1 = new FileInfo($"{baseName1}.pdf").Length;
-                var size2 = new FileInfo($"{baseName2}.pdf").Length;
-                Assert.Equal(size1, size2);
+                    var size1 = new FileInfo(Path.Combine(tempDir, "maze1.pdf")).Length;
+                    var size2 = new FileInfo(Path.Combine(tempDir, "maze2.pdf")).Length;
+                    Assert.Equal(size1, size2);
+                });
             }
             finally
             {
-                CleanupDir(tempDir1);
-                CleanupDir(tempDir2);
+                CleanupDir(tempDir);
+            }
+        }
+
+        [Fact]
+        public void Execute_UnparsableArgument_Returns1()
+        {
+            // CommandLineParser cannot convert "not-a-number" to int -> error handler returns 1.
+            var result = MazeCommand.Execute(new[] { "--rings", "not-a-number" });
+            Assert.Equal(1, result);
+        }
+
+        [Fact]
+        public void Execute_PositiveMinCoverage_Succeeds_AndShowsCoverageSatisfiedMessage()
+        {
+            var tempDir = CreateTempDir();
+            try
+            {
+                RunInDir(tempDir, () =>
+                {
+                    var result = MazeCommand.Execute(new[]
+                    {
+                        "--rings", "5",
+                        "--seed", "42",
+                        "--min-coverage", "30",
+                        "-o", "test_maze"
+                    });
+                    Assert.Equal(0, result);
+                    Assert.True(File.Exists(Path.Combine(tempDir, "test_maze.pdf")));
+                });
+            }
+            finally
+            {
+                CleanupDir(tempDir);
+            }
+        }
+
+        [Fact]
+        public void Execute_InvalidOutputDirectory_Returns1()
+        {
+            // Subdirectory does not exist -> PDF save throws -> catch block returns 1.
+            // No cleanup needed — the directory is never created, so there is nothing to remove.
+            var tempDir = CreateTempDir();
+            try
+            {
+                RunInDir(tempDir, () =>
+                {
+                    var result = MazeCommand.Execute(new[]
+                    {
+                        "--rings", "3",
+                        "--seed", "42",
+                        "--min-coverage", "0",
+                        "-o", "no_such_subdir/maze"
+                    });
+                    Assert.Equal(1, result);
+                });
+            }
+            finally
+            {
+                CleanupDir(tempDir);
             }
         }
 
@@ -119,17 +202,19 @@ namespace MazeGenerator.Tests.CLI
         public void Execute_InvalidWallThickness_Returns1()
         {
             var tempDir = CreateTempDir();
-            var baseName = Path.Combine(tempDir, "test_maze");
             try
             {
-                var result = MazeCommand.Execute(new[]
+                RunInDir(tempDir, () =>
                 {
-                    "--rings", "3",
-                    "--wall-thickness", "0.1",
-                    "-o", baseName
-                });
+                    var result = MazeCommand.Execute(new[]
+                    {
+                        "--rings", "3",
+                        "--wall-thickness", "0.1",
+                        "-o", "test_maze"
+                    });
 
-                Assert.Equal(1, result);
+                    Assert.Equal(1, result);
+                });
             }
             finally
             {
@@ -141,20 +226,45 @@ namespace MazeGenerator.Tests.CLI
         public void Execute_WithSolution_CreatesBothPdfs()
         {
             var tempDir = CreateTempDir();
-            var baseName = Path.Combine(tempDir, "test_maze");
             try
             {
+                RunInDir(tempDir, () =>
+                {
+                    var result = MazeCommand.Execute(new[]
+                    {
+                        "--rings", "3",
+                        "--seed", "42",
+                        "--min-coverage", "0",
+                        "-o", "test_maze"
+                    });
+
+                    Assert.Equal(0, result);
+                    Assert.True(File.Exists(Path.Combine(tempDir, "test_maze.pdf")));
+                    Assert.True(File.Exists(Path.Combine(tempDir, "test_maze_solution.pdf")));
+                });
+            }
+            finally
+            {
+                CleanupDir(tempDir);
+            }
+        }
+
+        [Fact]
+        public void Execute_AbsoluteOutputPath_Returns1()
+        {
+            var tempDir = CreateTempDir();
+            try
+            {
+                var absolutePath = Path.Combine(tempDir, "test_maze");
                 var result = MazeCommand.Execute(new[]
                 {
                     "--rings", "3",
                     "--seed", "42",
                     "--min-coverage", "0",
-                    "-o", baseName
+                    "-o", absolutePath
                 });
 
-                Assert.Equal(0, result);
-                Assert.True(File.Exists($"{baseName}.pdf"));
-                Assert.True(File.Exists($"{baseName}_solution.pdf"));
+                Assert.Equal(1, result);
             }
             finally
             {
@@ -163,5 +273,3 @@ namespace MazeGenerator.Tests.CLI
         }
     }
 }
-
-

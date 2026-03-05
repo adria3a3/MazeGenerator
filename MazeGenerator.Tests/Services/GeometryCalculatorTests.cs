@@ -105,8 +105,24 @@ namespace MazeGenerator.Tests.Services
         [Fact]
         public void ValidateCellCounts_DecreasingCounts_ReturnsFalse()
         {
-            // Early decrease (not in last 2 rings) should fail
+            // Early decrease should fail
             Assert.False(GeometryCalculator.ValidateCellCounts(new List<int> { 12, 6, 12, 24, 24 }));
+        }
+
+        [Fact]
+        public void ValidateCellCounts_SecondToLastRingDecrease_ReturnsFalse()
+        {
+            // A decrease in the second-to-last ring must also fail — only the outermost ring is exempt
+            Assert.False(GeometryCalculator.ValidateCellCounts(new List<int> { 6, 12, 24, 12, 24 }));
+        }
+
+        [Fact]
+        public void GetAngularOverlap_WrapsAroundBoundary_ReturnsCorrectOverlap()
+        {
+            // Arc 1: [5.9, 6.4] straddles 2π (≈6.283), covering [5.9, 6.283] ∪ [0, 0.117].
+            // Arc 2: [0.0, 0.5]. Genuine overlap = [0, 0.117] ≈ 0.117 radians.
+            var overlap = GeometryCalculator.GetAngularOverlap(5.9, 5.9 + 0.5, 0.0, 0.5);
+            Assert.True(overlap > 0.05 && overlap < 0.2, $"Expected overlap ~0.117, got {overlap}");
         }
 
         [Fact]
@@ -141,6 +157,33 @@ namespace MazeGenerator.Tests.Services
         {
             var overlap = GeometryCalculator.GetAngularOverlap(0, Math.PI / 4, Math.PI / 2, Math.PI);
             Assert.True(overlap <= 0);
+        }
+
+        [Fact]
+        public void CalculateCellCounts_OddInnerRingRawCount_ResultIsEven()
+        {
+            // Large radius + thin walls: capped rawCount comes out as 15 (odd),
+            // triggering the count++ branch in ApplyAlignmentRules for ring 0.
+            var counts = GeometryCalculator.CalculateCellCounts(1, 50.0, 10.0, wallThickness: 0.5);
+            Assert.Single(counts);
+            Assert.True(counts[0] % 2 == 0, $"Inner ring count {counts[0]} must be even");
+            Assert.True(counts[0] >= 16, "Odd raw count (15) should have been rounded up to 16");
+        }
+
+        [Fact]
+        public void ValidateCellCounts_DecreaseInOutermostRingOnly_ReturnsTrue()
+        {
+            // A decrease is permitted only in the last ring; [6, 12, 8] should pass.
+            Assert.True(GeometryCalculator.ValidateCellCounts(new List<int> { 6, 12, 8 }));
+        }
+
+        [Fact]
+        public void GetAngularOverlap_NegativeStartAngle_NormalizesAndComputesCorrectly()
+        {
+            // After normalization: arc1 becomes [7π/4, 9π/4], arc2 stays [0, π/2].
+            // The period-shifted comparison (o2) yields overlap = π/4.
+            var overlap = GeometryCalculator.GetAngularOverlap(-Math.PI / 4, Math.PI / 4, 0, Math.PI / 2);
+            Assert.Equal(Math.PI / 4, overlap, 10);
         }
     }
 }

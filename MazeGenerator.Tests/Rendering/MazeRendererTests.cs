@@ -121,6 +121,61 @@ namespace MazeGenerator.Tests.Rendering
         }
 
         [Fact]
+        public void RenderMazeToPdf_DegeneratePassageOverlap_DoesNotThrow()
+        {
+            // A cell whose outward passage neighbor has angles near 2π — after the renderer's
+            // angle-shift logic the overlap is negative, exercising the degenerate-overlap guard
+            // in DrawPartialArc (the passage is silently dropped and the full arc is drawn).
+            var config = new MazeConfiguration
+            {
+                Rings = 2,
+                PageWidth = 400,
+                PageHeight = 600,
+                Margin = 20,
+                InnerRadius = 20,
+                WallThickness = 2.0
+            };
+            var grid = new MazeGrid(config);
+
+            // Ring 0, cell 0: angles [0.15, 0.25]
+            var innerCell = new Cell
+            {
+                RingIndex = 0, CellIndex = 0,
+                AngleStart = 0.15, AngleEnd = 0.25,
+                RadiusInner = 20, RadiusOuter = 50
+            };
+
+            // Ring 1, cell 0: angles [6.2, 6.28] — near 2π, won't truly overlap with innerCell
+            // after the renderer shifts it by -2π into the frame of innerCell.
+            var outerCell = new Cell
+            {
+                RingIndex = 1, CellIndex = 0,
+                AngleStart = 6.2, AngleEnd = 6.28,
+                RadiusInner = 50, RadiusOuter = 80
+            };
+
+            innerCell.CreatePassage(outerCell);
+            outerCell.CreatePassage(innerCell);
+            innerCell.OutwardNeighbors.Add(outerCell);
+            outerCell.InwardNeighbors.Add(innerCell);
+
+            grid.Cells.Add(new List<Cell> { innerCell });
+            grid.Cells.Add(new List<Cell> { outerCell });
+
+            var renderer = new MazeRenderer();
+            var outputPath = Path.Combine(Path.GetTempPath(), $"maze_degenerate_{Guid.NewGuid():N}.pdf");
+            try
+            {
+                renderer.RenderMazeToPdf(grid, outputPath);
+                Assert.True(File.Exists(outputPath));
+            }
+            finally
+            {
+                if (File.Exists(outputPath)) File.Delete(outputPath);
+            }
+        }
+
+        [Fact]
         public void RenderMazeWithSolutionToPdf_EmptySolution_SkipsSolutionDrawing()
         {
             var renderer = new MazeRenderer();

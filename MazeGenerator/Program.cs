@@ -1,4 +1,4 @@
 ﻿using MazeGenerator.CLI;
 
-MazeCommand.Execute(args);
+return MazeCommand.Execute(args);
 
