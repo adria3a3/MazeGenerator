@@ -1,44 +1,51 @@
-﻿namespace MazeGenerator.Models;
+namespace MazeGenerator.Models;
 
 public class Cell
 {
-    public int RingIndex { get; set; }
-    
-    public int CellIndex { get; set; }
-    
-    public double AngleStart { get; set; }
-    
-    public double AngleEnd { get; set; }
-    
-    public double RadiusInner { get; set; }
-    
-    public double RadiusOuter { get; set; }
-    
+    public int RingIndex { get; init; }
+
+    public int CellIndex { get; init; }
+
+    public double AngleStart { get; init; }
+
+    public double AngleEnd { get; init; }
+
+    public double RadiusInner { get; init; }
+
+    public double RadiusOuter { get; init; }
+
     public bool Visited { get; set; }
-    
+
     public bool IsExit { get; set; }
-    
+
     public Cell? ClockwiseNeighbor { get; set; }
-    
+
     public Cell? CounterClockwiseNeighbor { get; set; }
-    
+
     public List<Cell> InwardNeighbors { get; } = new List<Cell>();
-    
+
     public List<Cell> OutwardNeighbors { get; } = new List<Cell>();
-    
-    public List<Cell> Passages { get; } = new List<Cell>();
+
+    private readonly List<Cell> _passages = new List<Cell>();
+
+    public IReadOnlyList<Cell> Passages => _passages;
 
     public IReadOnlyList<Cell> GetPassableNeighbors()
     {
-        return Passages;
+        return _passages;
     }
 
     public void CreatePassage(Cell neighbor)
     {
-        if (!Passages.Contains(neighbor))
+        if (!_passages.Contains(neighbor))
         {
-            Passages.Add(neighbor);
+            _passages.Add(neighbor);
         }
+    }
+
+    public void ClearPassages()
+    {
+        _passages.Clear();
     }
 
     public override string ToString()
@@ -46,4 +53,3 @@ public class Cell
         return $"Cell[R{RingIndex},C{CellIndex}]";
     }
 }
-

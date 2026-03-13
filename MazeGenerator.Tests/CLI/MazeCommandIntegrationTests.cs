@@ -173,10 +173,9 @@ namespace MazeGenerator.Tests.CLI
         }
 
         [Fact]
-        public void Execute_InvalidOutputDirectory_Returns1()
+        public void Execute_OutputWithPathSeparator_Returns1()
         {
-            // Subdirectory does not exist -> PDF save throws -> catch block returns 1.
-            // No cleanup needed — the directory is never created, so there is nothing to remove.
+            // Path separators in output name are rejected by validation.
             var tempDir = CreateTempDir();
             try
             {

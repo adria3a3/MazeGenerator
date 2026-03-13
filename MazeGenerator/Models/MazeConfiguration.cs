@@ -13,10 +13,16 @@ public class MazeConfiguration
     public double WallThickness { get; init; } = 2.0;
     
     public bool NoSolution { get; init; }
-    
-    public double PageWidth { get; init; } = 1191.0;
-    
-    public double PageHeight { get; init; } = 1684.0;
+
+    public MazeAlgorithm Algorithm { get; init; } = MazeAlgorithm.DfsBacktracker;
+
+    public OutputFormat OutputFormat { get; init; } = OutputFormat.Pdf;
+
+    public PageSizeName PageSizeName { get; init; } = PageSizeName.A2;
+
+    public double PageWidth { get; init; } = 1190.55;
+
+    public double PageHeight { get; init; } = 1683.78;
     
     public double Margin { get; init; } = 36.0;
     
@@ -43,6 +49,10 @@ public class MazeConfiguration
 
         if (!string.IsNullOrWhiteSpace(OutputBaseName) && Path.IsPathRooted(OutputBaseName))
             errors.Add("Output base name must be a relative path.");
+
+        if (!string.IsNullOrWhiteSpace(OutputBaseName) &&
+            (OutputBaseName.Contains('/') || OutputBaseName.Contains('\\')))
+            errors.Add("Output base name must not contain path separators.");
 
         if (PageWidth <= 0)
             errors.Add("PageWidth must be positive.");

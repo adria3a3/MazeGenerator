@@ -1,5 +1,9 @@
 using CommandLine;
+using MazeGenerator.DI;
 using MazeGenerator.Models;
+using MazeGenerator.Rendering;
+using MazeGenerator.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MazeGenerator.CLI;
 
@@ -22,6 +26,15 @@ public class Options
 
     [Option("no-solution", Default = false, HelpText = "Skip generation of solution file.")]
     public bool NoSolution { get; init; }
+
+    [Option('a', "algorithm", Default = MazeAlgorithm.DfsBacktracker, HelpText = "Maze generation algorithm: DfsBacktracker, Prims, Kruskals, Wilsons.")]
+    public MazeAlgorithm Algorithm { get; init; }
+
+    [Option('f', "format", Default = OutputFormat.Pdf, HelpText = "Output format: Pdf, Svg, Png.")]
+    public OutputFormat Format { get; init; }
+
+    [Option('p', "page-size", Default = PageSizeName.A2, HelpText = "Page size: A4, A3, A2, Letter, Legal, Tabloid.")]
+    public PageSizeName PageSize { get; init; }
 }
 
 public static class MazeCommand
@@ -37,6 +50,7 @@ public static class MazeCommand
 
     private static int RunWithOptions(Options options)
     {
+        var (pageWidth, pageHeight) = PageSize.GetDimensions(options.PageSize);
         var config = new MazeConfiguration
         {
             Rings = options.Rings,
@@ -45,6 +59,11 @@ public static class MazeCommand
             OutputBaseName = options.OutputBaseName,
             WallThickness = options.WallThickness,
             NoSolution = options.NoSolution,
+            Algorithm = options.Algorithm,
+            OutputFormat = options.Format,
+            PageSizeName = options.PageSize,
+            PageWidth = pageWidth,
+            PageHeight = pageHeight,
         };
 
         // Validate configuration
@@ -61,64 +80,67 @@ public static class MazeCommand
 
         try
         {
-            // Phase 3: Build grid
+            var sp = ServiceRegistration.BuildServiceProvider(config);
+            var generator = sp.GetRequiredService<IMazeGenerator>();
+            var pathFinder = sp.GetRequiredService<IPathFinder>();
+            var entranceExitSelector = sp.GetRequiredService<IEntranceExitSelector>();
+            var outputRenderer = sp.GetRequiredService<IMazeRenderer>();
+
+            // Build grid
             Console.WriteLine("Building maze grid...");
             var grid = new MazeGrid(config);
-
             grid.Initialize();
             Console.WriteLine("✓ Grid initialized successfully");
             Console.WriteLine();
             DisplayGridStatistics(grid);
 
-            // Phase 4: Generate maze
-            Console.WriteLine("Generating maze...");
-            var generator = new Services.MazeGenerator(config.Seed);
+            // Generate maze
+            Console.WriteLine($"Generating maze (algorithm: {config.Algorithm})...");
             generator.GenerateMaze(grid);
             Console.WriteLine("✓ Maze generation complete");
             DisplayMazeStatistics(grid);
 
-            // Phase 5: Find optimal entrance/exit and create boundary openings.
-            // This always runs so the maze PDF always has a proper exit gap and open center.
+            // Find optimal entrance/exit
             Console.WriteLine("Finding entrance/exit...");
-            var random = config.Seed.HasValue ? new Random(config.Seed.Value) : new Random();
-            var pathFinder = new Services.PathFinder();
-
-            var (entrance, exit) = pathFinder.FindOptimalAndCreateOpenings(
-                grid, generator, random, config.MinCoverage, log: Console.WriteLine);
+            var (entrance, exit) = entranceExitSelector.FindOptimalAndCreateOpenings(
+                grid, generator, config.MinCoverage, log: Console.WriteLine);
 
             Console.WriteLine($"  Entrance: Ring {entrance.RingIndex}, Cell {entrance.CellIndex}");
             Console.WriteLine($"  Exit:     Ring {exit.RingIndex}, Cell {exit.CellIndex}");
 
-            grid.Entrance = entrance;
-            grid.Exit = exit;
-
-            // Phase 6: Find solution path (skipped when --no-solution is set)
+            // Find solution path
+            MazeSolution? solution = null;
             if (!config.NoSolution)
             {
                 var solutionPath = pathFinder.FindPath(entrance, exit);
-                grid.SolutionPath = solutionPath;
+                var coverage = pathFinder.CalculateCoverage(solutionPath.Count, grid.TotalCells);
+                solution = new MazeSolution(entrance, exit, solutionPath, coverage);
+                grid.Solution = solution;
                 Console.WriteLine("✓ Solution path found");
-                DisplaySolutionStatistics(grid, solutionPath, config);
+                DisplaySolutionStatistics(solution, grid.TotalCells, config);
             }
             else
             {
+                solution = new MazeSolution(entrance, exit, new List<Cell>(), 0);
+                grid.Solution = solution;
                 Console.WriteLine("Skipping solution path (--no-solution flag set)");
             }
 
-            // Phase 7: Render PDFs
-            Console.WriteLine("Rendering PDF output...");
+            // Render output
+            Console.WriteLine($"Rendering {config.OutputFormat} output...");
+            var ext = outputRenderer.FileExtension;
 
-            var renderer = new Rendering.MazeRenderer();
+            // Maze-only: pass entrance/exit (for boundary gap) but no path (no red line)
+            var mazeOnlySolution = new MazeSolution(entrance, exit, new List<Cell>(), 0);
+            var mazePath = $"{config.OutputBaseName}{ext}";
+            outputRenderer.Render(grid, mazeOnlySolution, mazePath);
+            Console.WriteLine($"  ✓ Saved maze to: {mazePath}");
 
-            var mazePdfPath = $"{config.OutputBaseName}.pdf";
-            renderer.RenderMazeToPdf(grid, mazePdfPath);
-            Console.WriteLine($"  ✓ Saved maze to: {mazePdfPath}");
-
-            if (grid.SolutionPath.Count > 0)
+            if (solution.Path.Count > 0)
             {
-                var solutionPdfPath = $"{config.OutputBaseName}_solution.pdf";
-                renderer.RenderMazeWithSolutionToPdf(grid, solutionPdfPath);
-                Console.WriteLine($"  ✓ Saved solution to: {solutionPdfPath}");
+                var solutionOutputPath = $"{config.OutputBaseName}_solution{ext}";
+                outputRenderer.Render(grid, solution, solutionOutputPath);
+                Console.WriteLine($"  ✓ Saved solution to: {solutionOutputPath}");
             }
 
             Console.WriteLine();
@@ -145,6 +167,7 @@ public static class MazeCommand
         Console.WriteLine("Maze Parameters:");
         Console.WriteLine($"  Rings:              {config.Rings}");
         Console.WriteLine($"  Min Coverage:       {config.MinCoverage}%");
+        Console.WriteLine($"  Algorithm:          {config.Algorithm}");
         Console.WriteLine($"  Random Seed:        {(config.Seed.HasValue ? config.Seed.Value.ToString() : "Random")}");
         Console.WriteLine();
         Console.WriteLine("Output Settings:");
@@ -153,7 +176,7 @@ public static class MazeCommand
         Console.WriteLine($"  Include Solution:   {(config.NoSolution ? "No" : "Yes")}");
         Console.WriteLine();
         Console.WriteLine("Page Settings:");
-        Console.WriteLine($"  Format:             A2 Portrait");
+        Console.WriteLine($"  Format:             {config.PageSizeName} Portrait");
         Console.WriteLine($"  Dimensions:         {config.PageWidth} × {config.PageHeight} pt");
         Console.WriteLine($"  Margin:             {config.Margin} pt");
         Console.WriteLine($"  Inner Radius:       {config.InnerRadius} pt");
@@ -213,20 +236,17 @@ public static class MazeCommand
         Console.WriteLine();
     }
 
-    private static void DisplaySolutionStatistics(MazeGrid grid, List<Cell> solutionPath, MazeConfiguration config)
+    private static void DisplaySolutionStatistics(MazeSolution solution, int totalCells, MazeConfiguration config)
     {
-        var pathFinder = new Services.PathFinder();
-        var coverage = pathFinder.CalculateCoverage(solutionPath.Count, grid.TotalCells);
-
         Console.WriteLine();
         Console.WriteLine("Solution Path Statistics:");
-        Console.WriteLine($"  Path Length:        {solutionPath.Count} cells");
-        Console.WriteLine($"  Total Cells:        {grid.TotalCells}");
-        Console.WriteLine($"  Coverage:           {coverage:F1}%");
+        Console.WriteLine($"  Path Length:        {solution.Path.Count} cells");
+        Console.WriteLine($"  Total Cells:        {totalCells}");
+        Console.WriteLine($"  Coverage:           {solution.Coverage:F1}%");
         Console.WriteLine($"  Required:           {config.MinCoverage}%");
-        Console.WriteLine($"  Meets Requirement:  {(coverage >= config.MinCoverage ? "✓ Yes" : "✗ No")}");
+        Console.WriteLine($"  Meets Requirement:  {(solution.Coverage >= config.MinCoverage ? "✓ Yes" : "✗ No")}");
 
-        if (config.MinCoverage > 0 && coverage >= config.MinCoverage)
+        if (config.MinCoverage > 0 && solution.Coverage >= config.MinCoverage)
         {
             Console.WriteLine();
             Console.WriteLine("✓ Coverage requirement satisfied with optimal entrance/exit selection.");

@@ -12,7 +12,7 @@ namespace MazeGenerator.Tests.Services
         public void GenerateMaze_AllCellsVisited()
         {
             var grid = CreateInitializedGrid();
-            var generator = new MazeGenerator.Services.MazeGenerator(seed: 42);
+            var generator = new MazeGenerator.Services.DfsBacktrackerGenerator(seed: 42);
 
             generator.GenerateMaze(grid);
 
@@ -23,7 +23,7 @@ namespace MazeGenerator.Tests.Services
         public void GenerateMaze_CreatesSpanningTree_NMinus1Passages()
         {
             var grid = CreateInitializedGrid();
-            var generator = new MazeGenerator.Services.MazeGenerator(seed: 42);
+            var generator = new MazeGenerator.Services.DfsBacktrackerGenerator(seed: 42);
 
             generator.GenerateMaze(grid);
 
@@ -36,20 +36,18 @@ namespace MazeGenerator.Tests.Services
         public void GenerateMaze_ResetsStateBeforeGeneration()
         {
             var grid = CreateInitializedGrid();
-            var generator = new MazeGenerator.Services.MazeGenerator(seed: 42);
+            var generator = new MazeGenerator.Services.DfsBacktrackerGenerator(seed: 42);
 
             // Set up some state that should be cleared
             generator.GenerateMaze(grid);
-            grid.Entrance = grid.Cells[0][0];
-            grid.Exit = grid.Cells[grid.Cells.Count - 1][0];
-            grid.SolutionPath.Add(grid.Cells[0][0]);
+            var entrance = grid.Cells[0][0];
+            var exit = grid.Cells[grid.Cells.Count - 1][0];
+            grid.Solution = new MazeSolution(entrance, exit, new List<Cell> { entrance }, 10);
 
             // Regenerate — state should be reset
             generator.GenerateMaze(grid);
 
-            Assert.Null(grid.Entrance);
-            Assert.Null(grid.Exit);
-            Assert.Empty(grid.SolutionPath);
+            Assert.Null(grid.Solution);
         }
 
         [Fact]
@@ -57,8 +55,8 @@ namespace MazeGenerator.Tests.Services
         {
             var grid1 = CreateInitializedGrid();
             var grid2 = CreateInitializedGrid();
-            var gen1 = new MazeGenerator.Services.MazeGenerator(seed: 123);
-            var gen2 = new MazeGenerator.Services.MazeGenerator(seed: 123);
+            var gen1 = new MazeGenerator.Services.DfsBacktrackerGenerator(seed: 123);
+            var gen2 = new MazeGenerator.Services.DfsBacktrackerGenerator(seed: 123);
 
             gen1.GenerateMaze(grid1);
             gen2.GenerateMaze(grid2);
@@ -81,8 +79,8 @@ namespace MazeGenerator.Tests.Services
         {
             var grid1 = CreateInitializedGrid(5);
             var grid2 = CreateInitializedGrid(5);
-            var gen1 = new MazeGenerator.Services.MazeGenerator(seed: 1);
-            var gen2 = new MazeGenerator.Services.MazeGenerator(seed: 9999);
+            var gen1 = new MazeGenerator.Services.DfsBacktrackerGenerator(seed: 1);
+            var gen2 = new MazeGenerator.Services.DfsBacktrackerGenerator(seed: 9999);
 
             gen1.GenerateMaze(grid1);
             gen2.GenerateMaze(grid2);
@@ -109,7 +107,7 @@ namespace MazeGenerator.Tests.Services
         {
             // A small grid forces frequent backtracking
             var grid = CreateInitializedGrid(1);
-            var generator = new MazeGenerator.Services.MazeGenerator(seed: 42);
+            var generator = new MazeGenerator.Services.DfsBacktrackerGenerator(seed: 42);
 
             generator.GenerateMaze(grid);
 

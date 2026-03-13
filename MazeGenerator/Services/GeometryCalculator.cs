@@ -53,11 +53,10 @@ public class GeometryCalculator
     
     private static int ApplyAlignmentRules(int rawCount, List<int> previousCounts, int ringIndex)
     {
-        // Ring 1 (index 0): Use raw count but ensure it's even and >= 6
+        // Ring 1 (index 0): ensure count is even for better symmetry
         if (ringIndex == 0)
         {
-            var count = Math.Max(rawCount, 6);
-            // Prefer even numbers for better symmetry
+            var count = rawCount; // already >= 6 from caller
             if (count % 2 == 1)
                 count++;
             return count;
@@ -88,12 +87,6 @@ public class GeometryCalculator
                     bestCount = candidate;
                 }
             }
-        }
-        
-        // Also consider the raw count if it's close to a multiple
-        if (Math.Abs(rawCount - bestCount) < 3)
-        {
-            bestCount = rawCount;
         }
         
         // Ensure we're not decreasing (outer rings should have same or more cells)
@@ -135,11 +128,7 @@ public class GeometryCalculator
         for (var i = 1; i < cellCounts.Count; i++)
         {
             if (cellCounts[i] < cellCounts[i - 1])
-            {
-                // Allow a decrease only in the outermost ring
-                if (i < cellCounts.Count - 1)
-                    return false;
-            }
+                return false;
         }
         
         return true;

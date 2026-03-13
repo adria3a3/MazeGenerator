@@ -113,8 +113,8 @@ public class GridBuilder
         
         foreach (var innerCell in innerRing)
         {
-            // Any angular overlap makes them potential neighbors
-            if (GeometryCalculator.GetAngularOverlap(cell.AngleStart, cell.AngleEnd, innerCell.AngleStart, innerCell.AngleEnd) > 0)
+            // Significant angular overlap (> floating-point epsilon) makes them potential neighbors
+            if (GeometryCalculator.AnglesOverlap(cell.AngleStart, cell.AngleEnd, innerCell.AngleStart, innerCell.AngleEnd))
             {
                 cell.InwardNeighbors.Add(innerCell);
             }
@@ -127,8 +127,8 @@ public class GridBuilder
 
         foreach (var outerCell in outerRing)
         {
-            // Any angular overlap makes them potential neighbors
-            if (GeometryCalculator.GetAngularOverlap(cell.AngleStart, cell.AngleEnd, outerCell.AngleStart, outerCell.AngleEnd) > 0)
+            // Significant angular overlap (> floating-point epsilon) makes them potential neighbors
+            if (GeometryCalculator.AnglesOverlap(cell.AngleStart, cell.AngleEnd, outerCell.AngleStart, outerCell.AngleEnd))
             {
                 cell.OutwardNeighbors.Add(outerCell);
             }

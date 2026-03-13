@@ -171,10 +171,10 @@ namespace MazeGenerator.Tests.Services
         }
 
         [Fact]
-        public void ValidateCellCounts_DecreaseInOutermostRingOnly_ReturnsTrue()
+        public void ValidateCellCounts_DecreaseInOutermostRing_ReturnsFalse()
         {
-            // A decrease is permitted only in the last ring; [6, 12, 8] should pass.
-            Assert.True(GeometryCalculator.ValidateCellCounts(new List<int> { 6, 12, 8 }));
+            // No decrease is permitted in any ring; [6, 12, 8] should fail.
+            Assert.False(GeometryCalculator.ValidateCellCounts(new List<int> { 6, 12, 8 }));
         }
 
         [Fact]

@@ -1,11 +1,6 @@
-﻿﻿
 using MazeGenerator.Models;
 using MazeGenerator.Rendering;
 using MazeGenerator.Services;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using Xunit;
 
 namespace MazeGenerator.Tests.Rendering
@@ -18,16 +13,19 @@ namespace MazeGenerator.Tests.Rendering
         private static string TempPdfPath() =>
             Path.Combine(Path.GetTempPath(), $"maze_test_{Guid.NewGuid():N}.pdf");
 
+        private static PdfMazeRenderer CreateRenderer() =>
+            new PdfMazeRenderer(new MazeWallCalculator());
+
         [Fact]
-        public void RenderMazeToPdf_CreatesOutputFile()
+        public void Render_CreatesOutputFile()
         {
-            var renderer = new MazeRenderer();
+            var renderer = CreateRenderer();
             var grid = CreateFullMazeGrid();
             var outputPath = TempPdfPath();
 
             try
             {
-                renderer.RenderMazeToPdf(grid, outputPath);
+                renderer.Render(grid, null, outputPath);
 
                 Assert.True(File.Exists(outputPath));
                 Assert.True(new FileInfo(outputPath).Length > 0);
@@ -39,26 +37,25 @@ namespace MazeGenerator.Tests.Rendering
         }
 
         [Fact]
-        public void RenderMazeWithSolutionToPdf_CreatesOutputFile()
+        public void Render_WithSolution_CreatesOutputFile()
         {
-            var renderer = new MazeRenderer();
+            var renderer = CreateRenderer();
             var grid = CreateFullMazeGrid(rings: 3);
 
-            // Use the production flow so the solution path is genuinely non-empty
             var pathFinder = new PathFinder();
-            var generator = new MazeGenerator.Services.MazeGenerator(42);
-            var (entrance, exit) = pathFinder.FindOptimalAndCreateOpenings(grid, generator, new Random(42), 0);
-            grid.Entrance = entrance;
-            grid.Exit = exit;
-            grid.SolutionPath = pathFinder.FindPath(entrance, exit);
+            var generator = new DfsBacktrackerGenerator(42);
+            var selector = new EntranceExitSelector(pathFinder);
+            var (entrance, exit) = selector.FindOptimalAndCreateOpenings(grid, generator, 0);
+            var solutionPath = pathFinder.FindPath(entrance, exit);
+            var solution = new MazeSolution(entrance, exit, solutionPath, 50.0);
 
-            Assert.NotEmpty(grid.SolutionPath); // Ensures solution rendering is actually exercised
+            Assert.NotEmpty(solution.Path);
 
             var outputPath = TempPdfPath();
 
             try
             {
-                renderer.RenderMazeWithSolutionToPdf(grid, outputPath);
+                renderer.Render(grid, solution, outputPath);
 
                 Assert.True(File.Exists(outputPath));
                 Assert.True(new FileInfo(outputPath).Length > 0);
@@ -70,21 +67,21 @@ namespace MazeGenerator.Tests.Rendering
         }
 
         [Fact]
-        public void RenderMazeToPdf_WithEntranceAndExit_DrawsBoundaryOpenings()
+        public void Render_WithExitSolution_DrawsBoundaryOpenings()
         {
-            var renderer = new MazeRenderer();
+            var renderer = CreateRenderer();
             var grid = CreateFullMazeGrid();
 
-            // Set entrance and exit for boundary opening rendering
-            grid.Entrance = grid.Cells[0][0];
-            grid.Exit = grid.Cells[grid.Cells.Count - 1][0];
-            grid.Exit.IsExit = true;
+            var entrance = grid.Cells[0][0];
+            var exit = grid.Cells[grid.Cells.Count - 1][0];
+            exit.IsExit = true;
+            var solution = new MazeSolution(entrance, exit, new List<Cell>(), 0);
 
             var outputPath = TempPdfPath();
 
             try
             {
-                renderer.RenderMazeToPdf(grid, outputPath);
+                renderer.Render(grid, solution, outputPath);
 
                 Assert.True(File.Exists(outputPath));
                 Assert.True(new FileInfo(outputPath).Length > 0);
@@ -96,20 +93,16 @@ namespace MazeGenerator.Tests.Rendering
         }
 
         [Fact]
-        public void RenderMazeToPdf_NoEntranceNoExit_DrawsCompleteBoundaries()
+        public void Render_NoSolution_DrawsCompleteBoundaries()
         {
-            var renderer = new MazeRenderer();
+            var renderer = CreateRenderer();
             var grid = CreateFullMazeGrid();
 
-            // Ensure no entrance/exit
-            grid.Entrance = null;
-            grid.Exit = null;
-
             var outputPath = TempPdfPath();
 
             try
             {
-                renderer.RenderMazeToPdf(grid, outputPath);
+                renderer.Render(grid, null, outputPath);
 
                 Assert.True(File.Exists(outputPath));
                 Assert.True(new FileInfo(outputPath).Length > 0);
@@ -121,11 +114,8 @@ namespace MazeGenerator.Tests.Rendering
         }
 
         [Fact]
-        public void RenderMazeToPdf_DegeneratePassageOverlap_DoesNotThrow()
+        public void Render_DegeneratePassageOverlap_DoesNotThrow()
         {
-            // A cell whose outward passage neighbor has angles near 2π — after the renderer's
-            // angle-shift logic the overlap is negative, exercising the degenerate-overlap guard
-            // in DrawPartialArc (the passage is silently dropped and the full arc is drawn).
             var config = new MazeConfiguration
             {
                 Rings = 2,
@@ -137,7 +127,6 @@ namespace MazeGenerator.Tests.Rendering
             };
             var grid = new MazeGrid(config);
 
-            // Ring 0, cell 0: angles [0.15, 0.25]
             var innerCell = new Cell
             {
                 RingIndex = 0, CellIndex = 0,
@@ -145,8 +134,6 @@ namespace MazeGenerator.Tests.Rendering
                 RadiusInner = 20, RadiusOuter = 50
             };
 
-            // Ring 1, cell 0: angles [6.2, 6.28] — near 2π, won't truly overlap with innerCell
-            // after the renderer shifts it by -2π into the frame of innerCell.
             var outerCell = new Cell
             {
                 RingIndex = 1, CellIndex = 0,
@@ -162,11 +149,11 @@ namespace MazeGenerator.Tests.Rendering
             grid.Cells.Add(new List<Cell> { innerCell });
             grid.Cells.Add(new List<Cell> { outerCell });
 
-            var renderer = new MazeRenderer();
+            var renderer = CreateRenderer();
             var outputPath = Path.Combine(Path.GetTempPath(), $"maze_degenerate_{Guid.NewGuid():N}.pdf");
             try
             {
-                renderer.RenderMazeToPdf(grid, outputPath);
+                renderer.Render(grid, null, outputPath);
                 Assert.True(File.Exists(outputPath));
             }
             finally
@@ -176,19 +163,16 @@ namespace MazeGenerator.Tests.Rendering
         }
 
         [Fact]
-        public void RenderMazeWithSolutionToPdf_EmptySolution_SkipsSolutionDrawing()
+        public void Render_NullSolution_SkipsSolutionDrawing()
         {
-            var renderer = new MazeRenderer();
+            var renderer = CreateRenderer();
             var grid = CreateFullMazeGrid();
-
-            // Empty solution path — should not draw solution
-            grid.SolutionPath = new List<Cell>();
 
             var outputPath = TempPdfPath();
 
             try
             {
-                renderer.RenderMazeWithSolutionToPdf(grid, outputPath);
+                renderer.Render(grid, null, outputPath);
 
                 Assert.True(File.Exists(outputPath));
                 Assert.True(new FileInfo(outputPath).Length > 0);
@@ -197,6 +181,13 @@ namespace MazeGenerator.Tests.Rendering
             {
                 if (File.Exists(outputPath)) File.Delete(outputPath);
             }
+        }
+
+        [Fact]
+        public void FileExtension_IsPdf()
+        {
+            var renderer = CreateRenderer();
+            Assert.Equal(".pdf", renderer.FileExtension);
         }
     }
 }

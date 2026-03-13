@@ -74,6 +74,54 @@ namespace MazeGenerator.Tests.Models
         }
 
         [Fact]
+        public void ClearPassages_RemovesAllPassages()
+        {
+            var cell = new Cell();
+            var n1 = new Cell();
+            var n2 = new Cell();
+            cell.CreatePassage(n1);
+            cell.CreatePassage(n2);
+
+            cell.ClearPassages();
+
+            Assert.Empty(cell.Passages);
+            Assert.Empty(cell.GetPassableNeighbors());
+        }
+
+        [Fact]
+        public void Passages_IsReadOnly()
+        {
+            var cell = new Cell();
+            cell.CreatePassage(new Cell());
+
+            var passages = cell.Passages;
+
+            Assert.IsAssignableFrom<IReadOnlyList<Cell>>(passages);
+            Assert.Single(passages);
+        }
+
+        [Fact]
+        public void InitOnlyProperties_CanBeSetDuringInitialization()
+        {
+            var cell = new Cell
+            {
+                RingIndex = 2,
+                CellIndex = 5,
+                AngleStart = 1.0,
+                AngleEnd = 2.0,
+                RadiusInner = 10.0,
+                RadiusOuter = 20.0
+            };
+
+            Assert.Equal(2, cell.RingIndex);
+            Assert.Equal(5, cell.CellIndex);
+            Assert.Equal(1.0, cell.AngleStart);
+            Assert.Equal(2.0, cell.AngleEnd);
+            Assert.Equal(10.0, cell.RadiusInner);
+            Assert.Equal(20.0, cell.RadiusOuter);
+        }
+
+        [Fact]
         public void ToString_ReturnsFormattedString()
         {
             var cell = new Cell { RingIndex = 3, CellIndex = 7 };

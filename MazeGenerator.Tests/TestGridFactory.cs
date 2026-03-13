@@ -24,7 +24,7 @@ internal static class TestGridFactory
     internal static MazeGrid CreateGeneratedGrid(int rings = 3, int seed = 42)
     {
         var grid = CreateInitializedGrid(rings);
-        new MazeGenerator.Services.MazeGenerator(seed).GenerateMaze(grid);
+        new MazeGenerator.Services.DfsBacktrackerGenerator(seed).GenerateMaze(grid);
         return grid;
     }
 }

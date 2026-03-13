@@ -2,29 +2,18 @@
 
 namespace MazeGenerator.Services;
 
-public class MazeGenerator : IMazeGenerator
+public class DfsBacktrackerGenerator : IMazeGenerator
 {
     private readonly Random _random;
 
-    public MazeGenerator(int? seed = null)
+    public DfsBacktrackerGenerator(int? seed = null)
     {
         _random = seed.HasValue ? new Random(seed.Value) : new Random();
     }
 
     public void GenerateMaze(MazeGrid grid)
     {
-        // Reset all cells to a default state
-        foreach (var cell in grid.GetAllCells())
-        {
-            cell.Visited = false;
-            cell.Passages.Clear(); // Reset passages
-            cell.IsExit = false; // Reset exit flag
-        }
-        
-        // Also clear the grid's entrance, exit, and solution path
-        grid.Entrance = null;
-        grid.Exit = null;
-        grid.SolutionPath.Clear();
+        MazeGeneratorHelper.ResetGrid(grid);
 
         // Start from a random cell in the maze
         var stack = new Stack<Cell>();
